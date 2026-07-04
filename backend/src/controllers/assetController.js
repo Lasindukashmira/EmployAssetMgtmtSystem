@@ -5,37 +5,43 @@
  * Reads/writes from the in-memory store (src/data/store.js via db.js).
  */
 
-const store = require('../config/db');
-
+// const store = require('../config/db');
+const { sql, getPool } = require('../config/db');
 // ── GET /api/assets ───────────────────────────────────────────────────────────
-const getAllAssets = (req, res, next) => {
+const getAllAssets = async (req, res, next) => {
   try {
-    res.json({ success: true, data: store.assets });
+    const pool = await getPool();
+    const result = await pool.query('SELECT * FROM Assets');
+    res.json({ success: true, data: result.recordset });
   } catch (err) {
     next(err);
   }
 };
 
 // ── GET /api/assets/:id ───────────────────────────────────────────────────────
-const getAssetById = (req, res, next) => {
+const getAssetById = async (req, res, next) => {
   try {
     const id = parseInt(req.params.id, 10);
-    const asset = store.assets.find((a) => a.AssetId === id);
+    const pool = await getPool();
+    const result = await pool
+      .request()
+      .input("id", sql.Int, id)
+      .query("SELECT * FROM Assets WHERE AssetId = @id");
 
-    if (!asset) {
+    if (!result.recordset.length) {
       const err = new Error(`Asset with ID ${id} not found`);
       err.statusCode = 404;
       return next(err);
     }
 
-    res.json({ success: true, data: asset });
+    res.json({ success: true, data: result.recordset[0] });
   } catch (err) {
     next(err);
   }
 };
 
 // ── POST /api/assets ──────────────────────────────────────────────────────────
-const createAsset = (req, res, next) => {
+const createAsset = async (req, res, next) => {
   try {
     const {
       AssetTag,
@@ -47,70 +53,131 @@ const createAsset = (req, res, next) => {
       PurchaseDate,
     } = req.body;
 
-    // Validate required fields
     if (!AssetTag || !AssetType) {
-      const err = new Error('AssetTag and AssetType are required');
-      err.statusCode = 400;
-      return next(err);
+      return res.status(400).json({
+        success: false,
+        message: "AssetTag and AssetType are required",
+      });
     }
+
+    const pool = await getPool();
 
     // Check AssetTag uniqueness
-    const tagExists = store.assets.some(
-      (a) => a.AssetTag.toUpperCase() === AssetTag.toUpperCase()
-    );
-    if (tagExists) {
-      const err = new Error(`Asset tag "${AssetTag}" already exists`);
-      err.statusCode = 409;
-      return next(err);
+    const tagCheck = await pool
+      .request()
+      .input("AssetTag", sql.VarChar(50), AssetTag.trim().toUpperCase())
+      .query(`
+        SELECT AssetId
+        FROM Assets
+        WHERE AssetTag = @AssetTag
+      `);
+
+    if (tagCheck.recordset.length > 0) {
+      return res.status(409).json({
+        success: false,
+        message: `Asset tag "${AssetTag}" already exists`,
+      });
     }
 
-    // Validate assignee exists if provided
-    const empId = AssignedToEmployeeId ? parseInt(AssignedToEmployeeId, 10) : null;
-    if (empId !== null) {
-      const employee = store.employees.find((e) => e.EmployeeId === empId);
-      if (!employee) {
-        const err = new Error(`Employee with ID ${empId} not found`);
-        err.statusCode = 404;
-        return next(err);
+    let employeeId = null;
+
+    if (AssignedToEmployeeId) {
+      employeeId = parseInt(AssignedToEmployeeId);
+
+      const empCheck = await pool
+        .request()
+        .input("EmployeeId", sql.Int, employeeId)
+        .query(`
+          SELECT EmployeeId
+          FROM Employees
+          WHERE EmployeeId = @EmployeeId
+        `);
+
+      if (empCheck.recordset.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: `Employee with ID ${employeeId} not found`,
+        });
       }
     }
 
-    // Auto-set Status based on assignment
-    let resolvedStatus = Status || 'Available';
-    if (empId !== null) resolvedStatus = 'Assigned';
-    else if (resolvedStatus === 'Assigned') resolvedStatus = 'Available';
+    let resolvedStatus = Status || "Available";
 
-    const newAsset = {
-      AssetId: store._nextAssetId++,
-      AssetTag: AssetTag.trim().toUpperCase(),
-      AssetType,
-      Model: Model ? Model.trim() : null,
-      SerialNumber: SerialNumber ? SerialNumber.trim() : null,
-      Status: resolvedStatus,
-      AssignedToEmployeeId: empId,
-      PurchaseDate: PurchaseDate || null,
-      CreatedAt: new Date().toISOString(),
-    };
+    if (employeeId) {
+      resolvedStatus = "Assigned";
+    } else if (resolvedStatus === "Assigned") {
+      resolvedStatus = "Available";
+    }
 
-    store.assets.push(newAsset);
+    const result = await pool
+      .request()
+      .input("AssetTag", sql.VarChar(50), AssetTag.trim().toUpperCase())
+      .input("AssetType", sql.VarChar(50), AssetType)
+      .input("Model", sql.VarChar(100), Model || null)
+      .input("SerialNumber", sql.VarChar(100), SerialNumber || null)
+      .input("Status", sql.VarChar(20), resolvedStatus)
+      .input("AssignedToEmployeeId", sql.Int, employeeId)
+      .input("PurchaseDate", sql.Date, PurchaseDate || null)
+      .query(`
+        INSERT INTO Assets (
+          AssetTag,
+          AssetType,
+          Model,
+          SerialNumber,
+          Status,
+          AssignedToEmployeeId,
+          PurchaseDate
+        )
+        OUTPUT INSERTED.*
+        VALUES (
+          @AssetTag,
+          @AssetType,
+          @Model,
+          @SerialNumber,
+          @Status,
+          @AssignedToEmployeeId,
+          @PurchaseDate
+        );
+      `);
 
-    res.status(201).json({ success: true, data: newAsset });
+    res.status(201).json({
+      success: true,
+      data: result.recordset[0],
+    });
+
   } catch (err) {
     next(err);
   }
 };
 
 // ── PUT /api/assets/:id ───────────────────────────────────────────────────────
-const updateAsset = (req, res, next) => {
+const updateAsset = async (req, res, next) => {
   try {
     const id = parseInt(req.params.id, 10);
-    const index = store.assets.findIndex((a) => a.AssetId === id);
 
-    if (index === -1) {
-      const err = new Error(`Asset with ID ${id} not found`);
-      err.statusCode = 404;
-      return next(err);
+    if (isNaN(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid asset ID",
+      });
     }
+
+    const pool = await getPool();
+
+    // Check asset exists
+    const assetResult = await pool
+      .request()
+      .input("AssetId", sql.Int, id)
+      .query("SELECT * FROM Assets WHERE AssetId = @AssetId");
+
+    if (assetResult.recordset.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: `Asset with ID ${id} not found`,
+      });
+    }
+
+    const asset = assetResult.recordset[0];
 
     const {
       AssetType,
@@ -121,101 +188,200 @@ const updateAsset = (req, res, next) => {
       PurchaseDate,
     } = req.body;
 
-    // Validate assignee if being changed
-    const empId =
-      AssignedToEmployeeId !== undefined
-        ? AssignedToEmployeeId !== null && AssignedToEmployeeId !== ''
-          ? parseInt(AssignedToEmployeeId, 10)
-          : null
-        : store.assets[index].AssignedToEmployeeId;
+    // Determine employee ID
+    let employeeId = asset.AssignedToEmployeeId;
 
-    if (empId !== null) {
-      const employee = store.employees.find((e) => e.EmployeeId === empId);
-      if (!employee) {
-        const err = new Error(`Employee with ID ${empId} not found`);
-        err.statusCode = 404;
-        return next(err);
+    if (AssignedToEmployeeId !== undefined) {
+      employeeId =
+        AssignedToEmployeeId === null || AssignedToEmployeeId === ""
+          ? null
+          : parseInt(AssignedToEmployeeId);
+
+      if (employeeId !== null) {
+        const employeeResult = await pool
+          .request()
+          .input("EmployeeId", sql.Int, employeeId)
+          .query(
+            "SELECT EmployeeId FROM Employees WHERE EmployeeId = @EmployeeId"
+          );
+
+        if (employeeResult.recordset.length === 0) {
+          return res.status(404).json({
+            success: false,
+            message: `Employee with ID ${employeeId} not found`,
+          });
+        }
       }
     }
 
     // Resolve status
-    let resolvedStatus = Status !== undefined ? Status : store.assets[index].Status;
-    if (empId !== null) resolvedStatus = 'Assigned';
-    else if (resolvedStatus === 'Assigned') resolvedStatus = 'Available';
+    let resolvedStatus = Status ?? asset.Status;
 
-    store.assets[index] = {
-      ...store.assets[index],
-      ...(AssetType !== undefined && { AssetType }),
-      ...(Model !== undefined && { Model: Model ? Model.trim() : null }),
-      ...(SerialNumber !== undefined && {
-        SerialNumber: SerialNumber ? SerialNumber.trim() : null,
-      }),
-      ...(PurchaseDate !== undefined && { PurchaseDate }),
-      AssignedToEmployeeId: empId,
-      Status: resolvedStatus,
-    };
+    if (employeeId !== null) {
+      resolvedStatus = "Assigned";
+    } else if (resolvedStatus === "Assigned") {
+      resolvedStatus = "Available";
+    }
 
-    res.json({ success: true, data: store.assets[index] });
+    // Update asset
+    const updateResult = await pool
+      .request()
+      .input("AssetId", sql.Int, id)
+      .input("AssetType", sql.VarChar(50), AssetType ?? asset.AssetType)
+      .input("Model", sql.VarChar(100), Model ?? asset.Model)
+      .input(
+        "SerialNumber",
+        sql.VarChar(100),
+        SerialNumber ?? asset.SerialNumber
+      )
+      .input("Status", sql.VarChar(20), resolvedStatus)
+      .input("AssignedToEmployeeId", sql.Int, employeeId)
+      .input("PurchaseDate", sql.Date, PurchaseDate ?? asset.PurchaseDate)
+      .query(`
+        UPDATE Assets
+        SET
+          AssetType = @AssetType,
+          Model = @Model,
+          SerialNumber = @SerialNumber,
+          Status = @Status,
+          AssignedToEmployeeId = @AssignedToEmployeeId,
+          PurchaseDate = @PurchaseDate
+        OUTPUT INSERTED.*
+        WHERE AssetId = @AssetId;
+      `);
+
+    res.json({
+      success: true,
+      data: updateResult.recordset[0],
+    });
   } catch (err) {
     next(err);
   }
 };
 
 // ── PATCH /api/assets/:id/assign ──────────────────────────────────────────────
-const assignAsset = (req, res, next) => {
+const assignAsset = async (req, res, next) => {
   try {
-    const id = parseInt(req.params.id, 10);
-    const index = store.assets.findIndex((a) => a.AssetId === id);
+    const assetId = parseInt(req.params.id, 10);
 
-    if (index === -1) {
-      const err = new Error(`Asset with ID ${id} not found`);
-      err.statusCode = 404;
-      return next(err);
+    if (isNaN(assetId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid asset ID",
+      });
     }
 
     const rawId = req.body.AssignedToEmployeeId;
-    const empId =
-      rawId !== null && rawId !== undefined && rawId !== ''
+
+    const employeeId =
+      rawId !== null && rawId !== undefined && rawId !== ""
         ? parseInt(rawId, 10)
         : null;
 
-    if (empId !== null) {
-      const employee = store.employees.find((e) => e.EmployeeId === empId);
-      if (!employee) {
-        const err = new Error(`Employee with ID ${empId} not found`);
-        err.statusCode = 404;
-        return next(err);
+    const pool = await getPool();
+
+    // Check asset exists
+    const assetResult = await pool
+      .request()
+      .input("AssetId", sql.Int, assetId)
+      .query("SELECT AssetId FROM Assets WHERE AssetId = @AssetId");
+
+    if (assetResult.recordset.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: `Asset with ID ${assetId} not found`,
+      });
+    }
+
+    // Check employee exists
+    if (employeeId !== null) {
+      const employeeResult = await pool
+        .request()
+        .input("EmployeeId", sql.Int, employeeId)
+        .query(
+          "SELECT EmployeeId FROM Employees WHERE EmployeeId = @EmployeeId"
+        );
+
+      if (employeeResult.recordset.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: `Employee with ID ${employeeId} not found`,
+        });
       }
     }
 
-    store.assets[index].AssignedToEmployeeId = empId;
-    store.assets[index].Status = empId !== null ? 'Assigned' : 'Available';
+    // Assign or unassign
+    const result = await pool
+      .request()
+      .input("AssetId", sql.Int, assetId)
+      .input("EmployeeId", sql.Int, employeeId)
+      .input(
+        "Status",
+        sql.VarChar(20),
+        employeeId !== null ? "Assigned" : "Available"
+      )
+      .query(`
+        UPDATE Assets
+        SET
+            AssignedToEmployeeId = @EmployeeId,
+            Status = @Status
+        OUTPUT INSERTED.*
+        WHERE AssetId = @AssetId;
+      `);
 
-    res.json({ success: true, data: store.assets[index] });
+    res.json({
+      success: true,
+      data: result.recordset[0],
+    });
+
   } catch (err) {
     next(err);
   }
 };
 
 // ── DELETE /api/assets/:id ────────────────────────────────────────────────────
-const deleteAsset = (req, res, next) => {
+
+
+const deleteAsset = async (req, res, next) => {
   try {
     const id = parseInt(req.params.id, 10);
-    const index = store.assets.findIndex((a) => a.AssetId === id);
 
-    if (index === -1) {
-      const err = new Error(`Asset with ID ${id} not found`);
-      err.statusCode = 404;
-      return next(err);
+    if (isNaN(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid asset ID",
+      });
     }
 
-    store.assets.splice(index, 1);
+    const pool = await getPool();
 
-    res.json({ success: true, message: 'Asset deleted successfully' });
+    const result = await pool
+      .request()
+      .input("AssetId", sql.Int, id)
+      .query(`
+        DELETE FROM Assets
+        OUTPUT DELETED.*
+        WHERE AssetId = @AssetId;
+      `);
+
+    if (result.recordset.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: `Asset with ID ${id} not found`,
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Asset deleted successfully",
+      data: result.recordset[0], // optional: returns deleted row
+    });
+
   } catch (err) {
     next(err);
   }
 };
+
 
 module.exports = {
   getAllAssets,

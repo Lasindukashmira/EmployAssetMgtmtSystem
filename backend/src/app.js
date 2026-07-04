@@ -6,9 +6,11 @@
  * cleanly in tests without actually binding to a port.
  */
 
+
+
 const express = require('express');
 const cors = require('cors');
-require('dotenv').config();
+
 
 const employeeRoutes = require('./routes/employeeRoutes');
 const assetRoutes = require('./routes/assetRoutes');

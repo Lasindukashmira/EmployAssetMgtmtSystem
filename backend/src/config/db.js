@@ -14,10 +14,9 @@
  *   3. Replace the in-memory CRUD in controllers with sql.query() calls
  */
 
-require('dotenv').config();
 const store = require('../data/store');
 
-/* ── Future Azure SQL block (uncomment when DB is ready) ──────────────────────
+//  ── Future Azure SQL block (uncomment when DB is ready) ──────────────────────
 const sql = require('mssql');
 
 const sqlConfig = {
@@ -41,7 +40,7 @@ const getPool = async () => {
   return pool;
 };
 module.exports = { getPool, sql };
-──────────────────────────────────────────────────────────────────────────────*/
+
 
 // Current mode: expose the in-memory store directly
-module.exports = store;
+// module.exports = store;
