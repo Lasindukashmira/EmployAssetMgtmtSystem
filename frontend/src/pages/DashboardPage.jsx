@@ -43,7 +43,7 @@ const DashboardPage = () => {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '50vh', gap: '1rem' }}>
         <p style={{ color: 'var(--danger)', fontWeight: 600 }}>{error}</p>
-        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Make sure the backend is running on <code>http://localhost:5000</code></p>
+        <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Make sure the backend is running on </p>
       </div>
     );
   }
@@ -55,7 +55,7 @@ const DashboardPage = () => {
   const assignedAssets = assets.filter(a => a.Status === 'Assigned').length;
   const availableAssets = assets.filter(a => a.Status === 'Available').length;
   const maintenanceAssets = assets.filter(a => a.Status === 'Maintenance').length;
-  
+
   const assignmentRate = totalAssets > 0 ? Math.round((assignedAssets / totalAssets) * 100) : 0;
 
   // Asset type breakdown
@@ -145,14 +145,14 @@ const DashboardPage = () => {
 
       {/* Visualizations Panel */}
       <div className="visuals-grid">
-        
+
         {/* Category Breakdown (Bar Graph) */}
         <div className="card" style={{ display: 'flex', flexDirection: 'column' }}>
           <div className="chart-header">
             <h3>Asset Category Distribution</h3>
             <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Sorted by count</span>
           </div>
-          
+
           <div className="asset-type-list" style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
             {typePercentages.length > 0 ? (
               typePercentages.map((item) => (
@@ -177,7 +177,7 @@ const DashboardPage = () => {
         {/* Utilization Gauge */}
         <div className="card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
           <h3 style={{ alignSelf: 'flex-start', marginBottom: '1.5rem' }}>Asset Assignment</h3>
-          
+
           <div className="progress-ring-container" style={{ position: 'relative' }}>
             <svg width="120" height="120" className="progress-ring-svg">
               <circle
@@ -202,7 +202,7 @@ const DashboardPage = () => {
               <span className="progress-subtext">Assigned</span>
             </div>
           </div>
-          
+
           <div style={{ display: 'flex', gap: '1.5rem', marginTop: '1.5rem', width: '100%', justifyContent: 'space-around', fontSize: '0.85rem' }}>
             <div style={{ textAlign: 'center' }}>
               <div style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: 'var(--primary)', display: 'inline-block', marginRight: '0.4rem' }}></div>
@@ -220,7 +220,7 @@ const DashboardPage = () => {
 
       {/* Quick Actions & Stock Previews */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-        
+
         {/* Quick Task Actions */}
         <div className="card">
           <h3 style={{ marginBottom: '1.25rem' }}>Administration Shortcuts</h3>

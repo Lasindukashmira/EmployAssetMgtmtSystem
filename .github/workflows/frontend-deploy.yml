@@ -1,0 +1,47 @@
+name: Frontend Deployment
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "frontend/**"
+
+jobs:
+  frontend-build-deploy:
+
+    runs-on: self-hosted
+
+    steps:
+
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+
+      - name: Install Frontend Dependencies
+        working-directory: frontend
+        run: npm ci
+
+
+      - name: Configure Environment Variables
+        working-directory: frontend
+        run: |
+          echo "VITE_API_BASE_URL=${{ secrets.VITE_API_BASE_URL }}" > .env
+
+
+      - name: Build Frontend
+        working-directory: frontend
+        run: npm run build
+
+
+      - name: Deploy Frontend Files
+        run: |
+          rsync -avz --delete \
+          frontend/dist/ \
+          azureuser@10.0.1.4:/var/www/html/
