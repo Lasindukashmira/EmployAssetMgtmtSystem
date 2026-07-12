@@ -24,21 +24,21 @@ const Navbar = () => {
           <Laptop size={24} style={{ color: 'var(--primary)' }} />
           <span>EA Directory</span>
         </NavLink>
-        
+
         <ul className="nav-links">
           <li>
-            <NavLink 
-              to="/" 
+            <NavLink
+              to="/"
               className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
               end
             >
               <LayoutDashboard size={18} />
-              <span>Dashboard</span>
+              <span>Overall Dashboard</span>
             </NavLink>
           </li>
           <li>
-            <NavLink 
-              to="/employees" 
+            <NavLink
+              to="/employees"
               className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
             >
               <Users size={18} />
@@ -46,8 +46,8 @@ const Navbar = () => {
             </NavLink>
           </li>
           <li>
-            <NavLink 
-              to="/assets" 
+            <NavLink
+              to="/assets"
               className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
             >
               <Laptop size={18} />
@@ -55,8 +55,8 @@ const Navbar = () => {
             </NavLink>
           </li>
           <li style={{ marginLeft: '1rem' }}>
-            <button 
-              onClick={() => setIsLightMode(!isLightMode)} 
+            <button
+              onClick={() => setIsLightMode(!isLightMode)}
               className="theme-toggle-btn"
               title={isLightMode ? "Switch to Dark Mode" : "Switch to Light Mode"}
               aria-label="Toggle theme"
