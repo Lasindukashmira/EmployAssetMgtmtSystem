@@ -41,7 +41,7 @@ app.get('/api/health', (req, res) => {
     success: true,
     status: 'OK',
     timestamp: new Date().toISOString(),
-    message: 'Employee & Asset API is running',
+    message: 'Employee & Asset API is running without erros',
   });
 });
 
