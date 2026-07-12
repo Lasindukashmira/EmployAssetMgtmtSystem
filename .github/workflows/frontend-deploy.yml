@@ -40,8 +40,9 @@ jobs:
         run: npm run build
 
 
-      - name: Deploy Frontend Files
+      - name: Deploy Frontend
         run: |
-          rsync -avz --delete \
-          frontend/dist/ \
-          azureuser@10.0.1.4:/var/www/html/
+          rsync -avz --delete frontend/dist/ azureuser@10.0.1.4:/tmp/frontend/
+
+          ssh azureuser@10.0.1.4 \
+          "sudo rsync -avz --delete /tmp/frontend/ /var/www/html/"
