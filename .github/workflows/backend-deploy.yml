@@ -1,0 +1,46 @@
+name: Backend Deployment
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/**"
+
+jobs:
+  backend-deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Sync Backend Files
+        run: |
+          rsync -az --delete \
+            --exclude 'node_modules' \
+            --exclude '.env' \
+            backend/ \
+            azureuser@10.0.2.4:~/backend/
+
+      - name: Configure Backend and Restart
+        run: |
+          ssh azureuser@10.0.2.4 << EOF
+          set -e
+
+          cd ~/backend
+
+          cat > .env << EOL
+          PORT=${{ secrets.PORT }}
+          DB_HOST=${{ secrets.DB_HOST }}
+          DB_NAME=${{ secrets.DB_NAME }}
+          DB_USER=${{ secrets.DB_USER }}
+          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          FRONTEND_ORIGIN=${{ secrets.FRONTEND_ORIGIN }}
+          EOL
+
+          npm install
+
+          pm2 restart backend
+
+          EOF
