@@ -22,7 +22,7 @@ const Navbar = () => {
       <div className="navbar-container">
         <NavLink to="/" className="nav-brand">
           <Laptop size={24} style={{ color: 'var(--primary)' }} />
-          <span>EA Directory</span>
+          <span>Employee & Asset Directory</span>
         </NavLink>
 
         <ul className="nav-links">
@@ -33,7 +33,7 @@ const Navbar = () => {
               end
             >
               <LayoutDashboard size={18} />
-              <span>Overall Dashboard</span>
+              <span> Dashboard</span>
             </NavLink>
           </li>
           <li>
